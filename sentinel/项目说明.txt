@@ -1,0 +1,46 @@
+
+项目说明：
+
+sentinel源码项目中的sentinel-dashboard:
+内部改造：
+流控规则新加了一个FlowControllerV1_new -- 查询规则从nacos查询，发布规则直接发布到nacos
+FlowControllerV1_origin还是默认的推送规则到客户端内存
+
+
+mall-user-sentinel-demo：
+1.如果配置了nacos的datasource,则就是集成了nacos数据源，项目初始化拉取nacos数据源并且监听nacos配置变化，
+但是只集成了nacos流控规则数据源，其它规则的数据源没有集成，所以其它规则的数据源还是从sentinel控制台配置规则
+后通过http接口推送到客户端然后客户端更新到内存中
+配置参考nacos中的dataId为mall-user-sentinel-demo配置
+2.注释掉nacos的datasource，则为原始模式，数据源就用：API 将规则推送至客户端并直接更新到内存中
+
+
+mall-user-sentinel-ribbon-demo：
+原始模式：
+数据源就用：API 将规则推送至客户端并直接更新到内存中
+整合了openfeign、restTemplate
+
+
+mall-user-sentinel-pull-demo:
+拉模式：
+首先 Sentinel 控制台通过 API 将规则推送至客户端并更新到内存中，接着注册的写数据源会将新的规则保存到本地的文件中。
+使用 pull 模式的数据源时一般不需要对 Sentinel 控制台进行改造。这种实现方法好处是简单，坏处是无法保证监控数据的一致性
+
+使用时需要在客户端注册数据源：将对应的读数据源注册至对应的 RuleManager，将写数据源注册至 transport 的 WritableDataSourceRegistry 中
+该功能已经在sentinel-datasource-extension-file-pull中封装好，使用时项目里只要引入这个包即可，不需要做其它任何事情
+
+使用该模式时，sentinel-dashboard需要采用把规则推送到客户端内存的模式
+
+
+mall-user-sentinel-push-demo：
+推模式:
+生产环境下一般更常用的是 push 模式的数据源。对于 push 模式的数据源,如远程配置中心（ZooKeeper, Nacos, Apollo等等），
+推送的操作不应由 Sentinel 客户端进行，而应该经控制台统一进行管理，直接进行推送，数据源仅负责获取配置中心推送的配置并更新到本地。
+因此推送规则正确做法应该是 配置中心控制台/Sentinel 控制台 → 配置中心 → Sentinel 数据源 → Sentinel，而不是经 Sentinel 数据源推送至配置中心
+
+这个方案需要sentinel控制台配合改造，目前sentinel控制台只改造了流控规则和热点规则，如果需要改造其它规则，其实就是把对应的controller
+参考FlowControllerV1_new做相应改造--查询直接从nacos读取，发布规则直接发布到nacos
+
+配置参考nacos中SENTINEL_GROUP组下的配置，如：
+mall-user-sentinel-rule-push-demo-flow-rules、
+mall-user-sentinel-rule-push-demo-param-flow-rules
